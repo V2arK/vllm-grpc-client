@@ -78,6 +78,7 @@ class Completions:
         logprobs: Optional[int] = None,
         prompt_logprobs: Optional[int] = None,
         seed: Optional[int] = None,
+        include_stop_str_in_output: bool = False,
         logit_bias: Optional[Dict[int, float]] = None,
         structured_outputs: Optional[StructuredOutputs] = None,
         timeout: Optional[float] = None,
@@ -109,6 +110,7 @@ class Completions:
         logprobs: Optional[int] = None,
         prompt_logprobs: Optional[int] = None,
         seed: Optional[int] = None,
+        include_stop_str_in_output: bool = False,
         logit_bias: Optional[Dict[int, float]] = None,
         structured_outputs: Optional[StructuredOutputs] = None,
         timeout: Optional[float] = None,
@@ -139,6 +141,7 @@ class Completions:
         logprobs: Optional[int] = None,
         prompt_logprobs: Optional[int] = None,
         seed: Optional[int] = None,
+        include_stop_str_in_output: bool = False,
         logit_bias: Optional[Dict[int, float]] = None,
         structured_outputs: Optional[StructuredOutputs] = None,
         timeout: Optional[float] = None,
@@ -168,6 +171,7 @@ class Completions:
             logprobs: Number of logprobs to return (not yet implemented in vLLM gRPC).
             prompt_logprobs: Number of prompt logprobs (not yet implemented).
             seed: Random seed for reproducibility.
+            include_stop_str_in_output: Whether to include stop strings in output.
             logit_bias: Token ID to bias mapping.
             structured_outputs: Structured output constraints.
             timeout: Request timeout in seconds.
@@ -200,6 +204,7 @@ class Completions:
             logprobs=logprobs,
             prompt_logprobs=prompt_logprobs,
             seed=seed,
+            include_stop_str_in_output=include_stop_str_in_output,
             logit_bias=logit_bias,
             structured_outputs=structured_outputs,
         )
@@ -276,6 +281,7 @@ class Completions:
         logprobs: Optional[int],
         prompt_logprobs: Optional[int],
         seed: Optional[int],
+        include_stop_str_in_output: bool,
         logit_bias: Optional[Dict[int, float]],
         structured_outputs: Optional[StructuredOutputs],
     ) -> vllm_engine_pb2.GenerateRequest:
@@ -292,6 +298,7 @@ class Completions:
             skip_special_tokens=skip_special_tokens,
             ignore_eos=ignore_eos,
             n=n,
+            include_stop_str_in_output=include_stop_str_in_output,
         )
 
         if temperature is not None:
@@ -414,6 +421,7 @@ class AsyncCompletions:
         logprobs: Optional[int] = None,
         prompt_logprobs: Optional[int] = None,
         seed: Optional[int] = None,
+        include_stop_str_in_output: bool = False,
         logit_bias: Optional[Dict[int, float]] = None,
         structured_outputs: Optional[StructuredOutputs] = None,
         timeout: Optional[float] = None,
@@ -445,6 +453,7 @@ class AsyncCompletions:
         logprobs: Optional[int] = None,
         prompt_logprobs: Optional[int] = None,
         seed: Optional[int] = None,
+        include_stop_str_in_output: bool = False,
         logit_bias: Optional[Dict[int, float]] = None,
         structured_outputs: Optional[StructuredOutputs] = None,
         timeout: Optional[float] = None,
@@ -475,6 +484,7 @@ class AsyncCompletions:
         logprobs: Optional[int] = None,
         prompt_logprobs: Optional[int] = None,
         seed: Optional[int] = None,
+        include_stop_str_in_output: bool = False,
         logit_bias: Optional[Dict[int, float]] = None,
         structured_outputs: Optional[StructuredOutputs] = None,
         timeout: Optional[float] = None,
@@ -509,6 +519,7 @@ class AsyncCompletions:
             logprobs=logprobs,
             prompt_logprobs=prompt_logprobs,
             seed=seed,
+            include_stop_str_in_output=include_stop_str_in_output,
             logit_bias=logit_bias,
             structured_outputs=structured_outputs,
         )
@@ -586,6 +597,7 @@ def _build_generate_request(
     logprobs: Optional[int],
     prompt_logprobs: Optional[int],
     seed: Optional[int],
+    include_stop_str_in_output: bool,
     logit_bias: Optional[Dict[int, float]],
     structured_outputs: Optional[StructuredOutputs],
 ) -> vllm_engine_pb2.GenerateRequest:
@@ -602,6 +614,7 @@ def _build_generate_request(
         skip_special_tokens=skip_special_tokens,
         ignore_eos=ignore_eos,
         n=n,
+        include_stop_str_in_output=include_stop_str_in_output,
     )
 
     if temperature is not None:

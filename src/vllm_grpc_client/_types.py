@@ -20,7 +20,12 @@ from pydantic import BaseModel, Field
 
 
 class ChoiceConstraint(BaseModel):
-    """List of allowed choices for structured output."""
+    """
+    List of allowed choices for structured output.
+
+    Usage:
+        StructuredOutputs(choice=ChoiceConstraint(choices=["yes", "no", "maybe"]))
+    """
 
     choices: List[str] = Field(default_factory=list)
 
@@ -31,11 +36,76 @@ class StructuredOutputs(BaseModel):
 
     Only one of the fields should be set. These map to vLLM's
     StructuredOutputsParams options.
+
+    Constraint Types:
+    -----------------
+
+    1. json_schema: Force output to match a JSON Schema.
+       - Pass a JSON Schema as a string
+       - Example: '{"type": "object", "properties": {"name": {"type": "string"}}}'
+
+    2. json_object: Force output to be valid JSON object.
+       - Set to True to enable
+       - Less strict than json_schema, just ensures valid JSON
+
+    3. regex: Force output to match a regex pattern.
+       - Standard regex syntax supported
+       - Example: r"\\d{4}-\\d{2}-\\d{2}" for dates
+
+    4. choice: Force output to be one of specified choices.
+       - Use ChoiceConstraint(choices=["a", "b", "c"])
+       - Useful for classification tasks
+
+    5. grammar: Force output to match a grammar.
+       - See Grammar Format Notes below
+
+    6. structural_tag: Structural tag constraint (advanced).
+       - Used for Harmony models and special structuring
+
+    Grammar Format Notes:
+    --------------------
+    vLLM supports two grammar formats depending on the backend:
+
+    **EBNF Format (xgrammar backend):**
+    - Uses `::=` for rule definitions
+    - Root rule should be named `root`
+    - Reference: https://github.com/ggerganov/llama.cpp/blob/master/grammars/README.md
+
+    Example:
+        ```
+        root ::= "SELECT" column "FROM" table
+        column ::= "id" | "name"
+        table ::= "users" | "orders"
+        ```
+
+    **Lark Format (auto-converted):**
+    - Uses `:` for rule definitions
+    - Root rule should be named `start`
+    - vLLM auto-converts to EBNF internally
+    - Reference: https://lark-parser.readthedocs.io/en/latest/grammar.html
+
+    Example:
+        ```
+        start: "SELECT" column "FROM" table
+        column: "id" | "name"
+        table: "users" | "orders"
+        ```
+
+    **Known Limitations:**
+    - Complex patterns like `('+' | '-')` may fail on xgrammar backend
+    - Character classes like `[0-9]+` may not be supported
+    - If you see "Failed to convert the grammar from GBNF to Lark" errors,
+      try simplifying the grammar or using Lark format
     """
 
     json_schema: Optional[str] = Field(default=None, description="JSON schema string")
     regex: Optional[str] = Field(default=None, description="Regex pattern")
-    grammar: Optional[str] = Field(default=None, description="Grammar/EBNF string")
+    grammar: Optional[str] = Field(
+        default=None,
+        description="Grammar string in EBNF or Lark format. "
+        "EBNF uses '::=' and 'root' as start rule. "
+        "Lark uses ':' and 'start' as start rule.",
+    )
     structural_tag: Optional[str] = Field(default=None, description="Structural tag")
     json_object: Optional[bool] = Field(default=None, description="Force JSON object output")
     choice: Optional[ChoiceConstraint] = Field(default=None, description="List of allowed choices")
@@ -47,6 +117,17 @@ class SamplingParams(BaseModel):
 
     These parameters control how the model generates text, including
     temperature, top-p, top-k sampling, and various penalties.
+
+    Key Parameters:
+    --------------
+    - temperature: Controls randomness (0.0 = deterministic, higher = more random)
+    - top_p: Nucleus sampling - consider tokens with cumulative probability <= top_p
+    - top_k: Only consider top-k tokens (0 = disabled)
+    - stop: List of strings that will stop generation when encountered
+    - include_stop_str_in_output: Whether to include the stop string in the output
+    - seed: For reproducible generation
+
+    Reference: vLLM SamplingParams in vllm/sampling_params.py
     """
 
     temperature: Optional[float] = Field(default=None, ge=0.0, description="Sampling temperature")
@@ -85,7 +166,10 @@ class SamplingParams(BaseModel):
 
     seed: Optional[int] = Field(default=None, description="Random seed for reproducibility")
     include_stop_str_in_output: bool = Field(
-        default=False, description="Include stop strings in output"
+        default=False,
+        description="Whether to include stop strings in output. "
+        "When True, if generation stops due to a stop string, that string "
+        "will be included in the output. When False (default), it is stripped.",
     )
     logit_bias: Optional[Dict[int, float]] = Field(
         default=None, description="Token ID to bias mapping"

@@ -9,17 +9,53 @@ Features covered:
 - JSON Schema constraint
 - JSON Object constraint
 - Regex pattern constraint
-- Grammar (EBNF) constraint
+- Grammar (EBNF/Lark) constraint
 - Choice constraint
 
 Note: Not all models support all constraint types. The server may return
 an error if a constraint is not supported.
 
+IMPORTANT - Grammar Constraint Notes:
+=====================================
+vLLM supports two grammar formats depending on the backend:
+
+1. EBNF (Extended Backus-Naur Form) - llama.cpp/xgrammar style:
+   - Uses `::=` for rule definitions
+   - Root rule should be named `root`
+   - Example:
+     ```
+     root ::= "hello" | "world"
+     ```
+   - Reference: https://github.com/ggerganov/llama.cpp/blob/master/grammars/README.md
+
+2. Lark Grammar Format:
+   - Uses `:` for rule definitions
+   - Root rule should be named `start`
+   - Example:
+     ```
+     start: "hello" | "world"
+     ```
+   - Reference: https://lark-parser.readthedocs.io/en/latest/grammar.html
+
+The vLLM server will attempt to auto-detect the format:
+- If the grammar contains `::=`, it's treated as EBNF
+- Otherwise, it's treated as Lark and converted to EBNF internally
+
+Common Issues:
+- Complex EBNF patterns like `('+' | '-')` may fail parsing
+- Some character classes like `[0-9]+` may not be supported
+- The server uses xgrammar which has specific syntax requirements
+
 Usage:
     python examples/04_structured_outputs.py
 """
 
-from vllm_grpc_client import VLLMGrpcClient, TokenDecoder, StructuredOutputs, ChoiceConstraint
+from vllm_grpc_client import (
+    ChoiceConstraint,
+    StructuredOutputs,
+    TokenDecoder,
+    VLLMGrpcClient,
+)
 
 # Server configuration
 GRPC_HOST = "10.28.115.40"
@@ -39,7 +75,7 @@ def main():
     print("JSON SCHEMA CONSTRAINT")
     print("=" * 60)
 
-    json_schema = '''{
+    json_schema = """{
         "type": "object",
         "properties": {
             "name": {"type": "string"},
@@ -47,7 +83,7 @@ def main():
             "city": {"type": "string"}
         },
         "required": ["name", "age", "city"]
-    }'''
+    }"""
 
     try:
         completion = client.completions.create(
@@ -152,15 +188,119 @@ def main():
     print()
 
     # =========================================================================
-    # 5. Grammar (EBNF) Constraint
+    # 5. Grammar Constraints
     # =========================================================================
-    # Force output to match a grammar
     print("=" * 60)
-    print("GRAMMAR (EBNF) CONSTRAINT")
+    print("GRAMMAR CONSTRAINTS")
     print("=" * 60)
 
-    # Simple arithmetic expression grammar
-    grammar = """
+    # -------------------------------------------------------------------------
+    # 5a. EBNF Grammar (llama.cpp / xgrammar style)
+    # -------------------------------------------------------------------------
+    # The vLLM xgrammar backend expects EBNF format with specific syntax.
+    # Root rule should be named 'root'.
+    #
+    # NOTE: Complex patterns may fail. The xgrammar parser is strict about
+    # certain syntax constructs. If you see errors like:
+    #   "Failed to convert the grammar from GBNF to Lark"
+    # it means the grammar syntax is not compatible with xgrammar.
+    #
+    # Working EBNF example (simple SQL-like grammar):
+    print("\n--- EBNF Grammar (xgrammar compatible) ---")
+
+    ebnf_grammar = """
+root ::= select_statement
+select_statement ::= "SELECT" column "from" table "where" condition
+column ::= "col_1" | "col_2"
+table ::= "table_1" | "table_2"
+condition ::= column "=" number
+number ::= "1" | "2"
+"""
+
+    try:
+        completion = client.completions.create(
+            prompt="Generate a SQL SELECT statement:",
+            max_tokens=50,
+            temperature=0.0,
+            structured_outputs=StructuredOutputs(grammar=ebnf_grammar),
+        )
+        text = decoder.decode_completion(completion)
+        print(f"EBNF Grammar result: {text}")
+    except Exception as e:
+        # Common error: xgrammar may reject certain EBNF syntax
+        print(f"EBNF Grammar error: {e}")
+    print()
+
+    # -------------------------------------------------------------------------
+    # 5b. Lark Grammar Format
+    # -------------------------------------------------------------------------
+    # vLLM can also accept Lark-style grammars, which use ':' instead of '::='
+    # The server will auto-convert Lark to EBNF internally.
+    # Root rule should be named 'start'.
+    print("--- Lark Grammar (auto-converted to EBNF) ---")
+
+    lark_grammar = """
+start: select_statement
+select_statement: "SELECT" column "from" table "where" condition
+column: "col_1" | "col_2"
+table: "table_1" | "table_2"
+condition: column "=" number
+number: "1" | "2"
+"""
+
+    try:
+        completion = client.completions.create(
+            prompt="Generate a SQL SELECT statement:",
+            max_tokens=50,
+            temperature=0.0,
+            structured_outputs=StructuredOutputs(grammar=lark_grammar),
+        )
+        text = decoder.decode_completion(completion)
+        print(f"Lark Grammar result: {text}")
+    except Exception as e:
+        print(f"Lark Grammar error: {e}")
+    print()
+
+    # -------------------------------------------------------------------------
+    # 5c. Simple Yes/No Grammar
+    # -------------------------------------------------------------------------
+    # A very simple grammar that should work on most backends
+    print("--- Simple Yes/No Grammar ---")
+
+    simple_grammar = """
+root ::= "yes" | "no"
+"""
+
+    try:
+        completion = client.completions.create(
+            prompt="Is the sky blue? Answer with yes or no:",
+            max_tokens=10,
+            temperature=0.0,
+            structured_outputs=StructuredOutputs(grammar=simple_grammar),
+        )
+        text = decoder.decode_completion(completion)
+        print(f"Simple Grammar result: {text}")
+    except Exception as e:
+        print(f"Simple Grammar error: {e}")
+    print()
+
+    # -------------------------------------------------------------------------
+    # 5d. Known Issue: Complex Arithmetic Grammar
+    # -------------------------------------------------------------------------
+    # NOTE: The following grammar demonstrates a known compatibility issue
+    # with the vLLM xgrammar backend. Grammars using certain constructs like
+    # grouped alternatives `('+' | '-')` or character classes `[0-9]+` may
+    # fail with parsing errors.
+    #
+    # Error example:
+    #   "Failed to convert the grammar from GBNF to Lark: Expected ')' at line X"
+    #
+    # This is a SERVER-SIDE limitation, not a client issue. The client
+    # correctly passes the grammar string to the server via gRPC.
+    print("--- Complex Grammar (may fail on some backends) ---")
+
+    # This grammar uses syntax that may not be fully supported
+    complex_grammar = """
     root ::= expr
     expr ::= term (('+' | '-') term)*
     term ::= factor (('*' | '/') factor)*
@@ -173,12 +313,15 @@ def main():
             prompt="Generate a simple math expression:",
             max_tokens=20,
             temperature=0.0,
-            structured_outputs=StructuredOutputs(grammar=grammar),
+            structured_outputs=StructuredOutputs(grammar=complex_grammar),
         )
         text = decoder.decode_completion(completion)
-        print(f"Grammar result: {text}")
+        print(f"Complex Grammar result: {text}")
     except Exception as e:
-        print(f"Grammar not supported or error: {e}")
+        # Expected: This may fail due to xgrammar parsing limitations
+        # The error originates from vLLM's backend_xgrammar.py which calls
+        # xgr.Grammar.from_ebnf() - certain EBNF constructs are not supported
+        print(f"Complex Grammar error (expected on xgrammar): {e}")
     print()
 
     # =========================================================================
@@ -202,7 +345,7 @@ def main():
                 ),
             )
             text = decoder.decode_completion(completion)
-            print(f"  Run {i+1}: {text}")
+            print(f"  Run {i + 1}: {text}")
     except Exception as e:
         print(f"Error: {e}")
     print()
