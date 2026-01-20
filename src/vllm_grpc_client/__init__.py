@@ -43,7 +43,9 @@ from vllm_grpc_client._types import (
     SamplingParams,
     ServerInfo,
     StructuredOutputs,
+    TokenizedInput,
 )
+from vllm_grpc_client.utils import TokenDecoder
 
 __version__ = "0.1.0"
 
@@ -69,6 +71,7 @@ __all__ = [
     "HealthCheckResponse",
     "ModelInfo",
     "ServerInfo",
+    "TokenizedInput",
     # Exceptions
     "VLLMGrpcError",
     "VLLMGrpcConnectionError",
@@ -77,4 +80,6 @@ __all__ = [
     "VLLMGrpcInvalidArgumentError",
     "VLLMGrpcUnavailableError",
     "VLLMGrpcUnimplementedError",
+    # Utilities
+    "TokenDecoder",
 ]

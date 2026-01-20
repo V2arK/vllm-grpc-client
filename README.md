@@ -10,6 +10,7 @@ This package provides a high-level Python client for interacting with vLLM's gRP
 - **Sync and Async support**: Both synchronous and asynchronous clients
 - **Streaming support**: Stream generation responses in real-time
 - **Type-safe**: Full type hints with Pydantic models
+- **Text decoding**: Built-in utilities to decode token IDs to text
 - **Production-ready**: Supports all vLLM gRPC features including:
   - Text generation (streaming and non-streaming)
   - Health checks
@@ -22,6 +23,9 @@ This package provides a high-level Python client for interacting with vLLM's gRP
 
 ```bash
 pip install vllm-grpc-client
+
+# For text decoding support
+pip install vllm-grpc-client transformers
 ```
 
 Or install from source:
@@ -104,6 +108,45 @@ with VLLMGrpcClient(host="localhost", port=9000) as client:
 # Async
 async with AsyncVLLMGrpcClient(host="localhost", port=9000) as client:
     result = await client.completions.create(prompt="Hello", max_tokens=10)
+```
+
+### Text Decoding
+
+The vLLM gRPC server returns **token IDs only**. To get plain text, use the `TokenDecoder`:
+
+```python
+from vllm_grpc_client import VLLMGrpcClient, TokenDecoder
+
+client = VLLMGrpcClient(host="localhost", port=9000)
+
+# Create decoder (automatically downloads the tokenizer)
+decoder = TokenDecoder.from_client(client)
+
+# Non-streaming with text
+completion = client.completions.create(
+    prompt="The capital of France is",
+    max_tokens=50,
+)
+text = decoder.decode_completion(completion)
+print(f"Generated text: {text}")
+
+# Streaming with text
+stream = client.completions.create(
+    prompt="Count from 1 to 5:",
+    max_tokens=30,
+    stream=True,
+)
+
+for chunk in stream:
+    delta_text = decoder.decode_chunk(chunk)
+    print(delta_text, end="", flush=True)
+
+client.close()
+```
+
+**Note**: Text decoding requires the `transformers` library:
+```bash
+pip install transformers
 ```
 
 ## API Reference
@@ -206,9 +249,9 @@ vllm_grpc_client/
 
 ## Limitations
 
+- **Token IDs only**: The gRPC interface returns token IDs by default. Use `TokenDecoder` to convert to text (requires `transformers` library)
 - **Embeddings**: The Embed RPC is not yet implemented in vLLM gRPC server
 - **Logprobs**: Logprobs support is marked as TODO in vLLM gRPC
-- **Text output**: The gRPC interface returns token IDs only; text decoding requires a tokenizer
 
 ## License
 
