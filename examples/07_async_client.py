@@ -22,7 +22,7 @@ import time
 from vllm_grpc_client import AsyncVLLMGrpcClient, TokenDecoder
 
 # Server configuration
-GRPC_HOST = "10.28.115.40"
+GRPC_HOST = "localhost"
 GRPC_PORT = 9000
 
 

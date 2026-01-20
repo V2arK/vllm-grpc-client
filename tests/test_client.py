@@ -5,7 +5,7 @@ Run with:
     pytest tests/test_client.py -v
 
 Or to run against a specific server:
-    VLLM_GRPC_HOST=10.28.115.40 VLLM_GRPC_PORT=9000 pytest tests/test_client.py -v
+    VLLM_GRPC_HOST=your-server-ip VLLM_GRPC_PORT=9000 pytest tests/test_client.py -v
 """
 
 import asyncio
@@ -20,7 +20,7 @@ from vllm_grpc_client import (
 )
 
 # Server configuration
-GRPC_HOST = os.environ.get("VLLM_GRPC_HOST", "10.28.115.40")
+GRPC_HOST = os.environ.get("VLLM_GRPC_HOST", "localhost")
 GRPC_PORT = int(os.environ.get("VLLM_GRPC_PORT", "9000"))
 
 

@@ -12,13 +12,33 @@ pip install -e ..
 pip install transformers
 ```
 
+## Starting a vLLM gRPC Server
+
+Before running the examples, you need a running vLLM gRPC server. Start one locally:
+
+```bash
+# Start vLLM with gRPC enabled
+python -m vllm.entrypoints.grpc_server \
+    --model <your-model-name> \
+    --host 0.0.0.0 \
+    --port 9000
+
+# Example with a specific model:
+python -m vllm.entrypoints.grpc_server \
+    --model meta-llama/Llama-3.1-8B-Instruct \
+    --host 0.0.0.0 \
+    --port 9000
+```
+
+Alternatively, if running vLLM via Docker or Kubernetes, ensure the gRPC port (default: 9000) is exposed.
+
 ## Server Configuration
 
 All examples use these default settings:
-- Host: `10.28.115.40`
+- Host: `localhost`
 - Port: `9000`
 
-Modify the `GRPC_HOST` and `GRPC_PORT` variables in each example to match your server.
+Modify the `GRPC_HOST` and `GRPC_PORT` variables in each example to connect to a remote server.
 
 ## Examples
 
@@ -148,7 +168,7 @@ python examples/09_tokenized_input.py
 from vllm_grpc_client import VLLMGrpcClient, TokenDecoder
 
 # Connect to server
-client = VLLMGrpcClient(host="10.28.115.40", port=9000)
+client = VLLMGrpcClient(host="localhost", port=9000)
 
 # Create decoder for text output
 decoder = TokenDecoder.from_client(client)
