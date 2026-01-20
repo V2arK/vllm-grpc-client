@@ -12,9 +12,7 @@ from typing import Optional
 
 import grpc
 
-from vllm_grpc_client._exceptions import VLLMGrpcConnectionError, _exception_from_grpc_error
 from vllm_grpc_client.proto import vllm_engine_pb2_grpc
-
 
 # Default timeout for gRPC calls (in seconds)
 DEFAULT_TIMEOUT = 60.0
@@ -52,6 +50,7 @@ class VLLMGrpcClient:
         host: Optional[str] = None,
         port: Optional[int] = None,
         *,
+        secure: Optional[bool] = None,
         timeout: Optional[float] = None,
         max_send_message_length: int = DEFAULT_MAX_MESSAGE_LENGTH,
         max_receive_message_length: int = DEFAULT_MAX_MESSAGE_LENGTH,
@@ -62,6 +61,9 @@ class VLLMGrpcClient:
         Args:
             host: The gRPC server host. Defaults to VLLM_GRPC_HOST env var or "localhost".
             port: The gRPC server port. Defaults to VLLM_GRPC_PORT env var or 9000.
+            secure: Whether to use TLS/SSL for the connection.
+                Defaults to VLLM_GRPC_SECURE env var or False.
+                Set to True when connecting via HTTPS (port 443).
             timeout: Default timeout for RPC calls in seconds.
                 Defaults to VLLM_GRPC_TIMEOUT env var or 60.0.
             max_send_message_length: Maximum send message size (-1 for unlimited).
@@ -72,6 +74,15 @@ class VLLMGrpcClient:
         self._port = port or int(os.environ.get("VLLM_GRPC_PORT", "9000"))
         self._timeout = timeout or float(os.environ.get("VLLM_GRPC_TIMEOUT", str(DEFAULT_TIMEOUT)))
 
+        # Resolve secure flag from parameter, env var, or default based on port
+        if secure is not None:
+            self._secure = secure
+        elif os.environ.get("VLLM_GRPC_SECURE"):
+            self._secure = os.environ.get("VLLM_GRPC_SECURE", "").lower() in ("true", "1", "yes")
+        else:
+            # Default to secure if using standard HTTPS port
+            self._secure = self._port == 443
+
         # Build server address
         self._address = f"{self._host}:{self._port}"
 
@@ -81,8 +92,14 @@ class VLLMGrpcClient:
             ("grpc.max_receive_message_length", max_receive_message_length),
         ]
 
-        # Create the gRPC channel
-        self._channel: grpc.Channel = grpc.insecure_channel(self._address, options=options)
+        # Create the gRPC channel (secure or insecure)
+        if self._secure:
+            credentials = grpc.ssl_channel_credentials()
+            self._channel: grpc.Channel = grpc.secure_channel(
+                self._address, credentials, options=options
+            )
+        else:
+            self._channel: grpc.Channel = grpc.insecure_channel(self._address, options=options)
         self._stub = vllm_engine_pb2_grpc.VllmEngineStub(self._channel)
 
         # Model name (populated by retrieve on first access if needed)
@@ -213,6 +230,7 @@ class AsyncVLLMGrpcClient:
         host: Optional[str] = None,
         port: Optional[int] = None,
         *,
+        secure: Optional[bool] = None,
         timeout: Optional[float] = None,
         max_send_message_length: int = DEFAULT_MAX_MESSAGE_LENGTH,
         max_receive_message_length: int = DEFAULT_MAX_MESSAGE_LENGTH,
@@ -223,6 +241,9 @@ class AsyncVLLMGrpcClient:
         Args:
             host: The gRPC server host. Defaults to VLLM_GRPC_HOST env var or "localhost".
             port: The gRPC server port. Defaults to VLLM_GRPC_PORT env var or 9000.
+            secure: Whether to use TLS/SSL for the connection.
+                Defaults to VLLM_GRPC_SECURE env var or False.
+                Set to True when connecting via HTTPS (port 443).
             timeout: Default timeout for RPC calls in seconds.
                 Defaults to VLLM_GRPC_TIMEOUT env var or 60.0.
             max_send_message_length: Maximum send message size (-1 for unlimited).
@@ -233,6 +254,15 @@ class AsyncVLLMGrpcClient:
         self._port = port or int(os.environ.get("VLLM_GRPC_PORT", "9000"))
         self._timeout = timeout or float(os.environ.get("VLLM_GRPC_TIMEOUT", str(DEFAULT_TIMEOUT)))
 
+        # Resolve secure flag from parameter, env var, or default based on port
+        if secure is not None:
+            self._secure = secure
+        elif os.environ.get("VLLM_GRPC_SECURE"):
+            self._secure = os.environ.get("VLLM_GRPC_SECURE", "").lower() in ("true", "1", "yes")
+        else:
+            # Default to secure if using standard HTTPS port
+            self._secure = self._port == 443
+
         # Build server address
         self._address = f"{self._host}:{self._port}"
 
@@ -242,8 +272,16 @@ class AsyncVLLMGrpcClient:
             ("grpc.max_receive_message_length", max_receive_message_length),
         ]
 
-        # Create the async gRPC channel
-        self._channel: grpc.aio.Channel = grpc.aio.insecure_channel(self._address, options=options)
+        # Create the async gRPC channel (secure or insecure)
+        if self._secure:
+            credentials = grpc.ssl_channel_credentials()
+            self._channel: grpc.aio.Channel = grpc.aio.secure_channel(
+                self._address, credentials, options=options
+            )
+        else:
+            self._channel: grpc.aio.Channel = grpc.aio.insecure_channel(
+                self._address, options=options
+            )
         self._stub = vllm_engine_pb2_grpc.VllmEngineStub(self._channel)
 
         # Model name (populated by retrieve on first access if needed)
